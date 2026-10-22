@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>毫米波雷达目标追踪</title>
+
+  <style>
+    body {
+      margin: 0;
+      color: #e8f5ff;
+      background: #07111f;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 20px 0 6px;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      color: #73e2ff;
+    }
+
+    canvas {
+      width: min(900px, 95vw);
+      height: auto;
+      border: 1px solid #1f5269;
+      border-radius: 12px;
+      background: #081827;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ESP32 毫米波雷达目标追踪</h1>
+  <div class="status">
+    当前模式：模拟数据｜目标数量：<span id="targetCount">3</span>
+  </div>
+
+  <canvas id="radar" width="900" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById("radar");
+    const ctx = canvas.getContext("2d");
+
+    const originX = canvas.width / 2;
+    const originY = canvas.height - 40;
+    const scale = 80;
+
+    function drawGrid() {
+      ctx.strokeStyle = "#17445a";
+      ctx.lineWidth = 1;
+
+      for (let distance = 1; distance <= 6; distance++) {
+        ctx.beginPath();
+        ctx.arc(
+          originX,
+          originY,
+          distance * scale,
+          Math.PI,
+          Math.PI * 2
+        );
+        ctx.stroke();
+
+        ctx.fillStyle = "#7293a3";
+        ctx.fillText(`${distance} m`, originX + 6, originY - distance * scale);
+      }
+
+      for (const degree of [-60, -30, 0, 30, 60]) {
+        const angle = (degree - 90) * Math.PI / 180;
+
+        ctx.beginPath();
+        ctx.moveTo(originX, originY);
+        ctx.lineTo(
+          originX + Math.cos(angle) * 6 * scale,
+          originY + Math.sin(angle) * 6 * scale
+        );
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(originX, originY, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillText("雷达", originX + 12, originY - 8);
+    }
+
+    function drawTarget(target, color) {
+      const screenX = originX + target.x_mm / 1000 * scale;
+      const screenY = originY - target.y_mm / 1000 * scale;
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(
+        `目标${target.id}  ${target.speed_cm_s} cm/s`,
+        screenX + 14,
+        screenY - 12
+      );
+    }
+
+    function createTargets(time) {
+      return [
+        {
+          id: 1,
+          x_mm: 1200 * Math.sin(time),
+          y_mm: 2500 + 500 * Math.cos(time),
+          speed_cm_s: Math.round(120 * Math.cos(time))
+        },
+        {
+          id: 2,
+          x_mm: -1500 + (time * 300) % 3000,
+          y_mm: 3800,
+          speed_cm_s: 30
+        },
+        {
+          id: 3,
+          x_mm: 800 * Math.cos(time * 0.6),
+          y_mm: 1500 + 600 * Math.sin(time * 0.6),
+          speed_cm_s: Math.round(48 * Math.cos(time * 0.6))
+        }
+      ];
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+
+      const targets = createTargets(Date.now() / 1000);
+
+      document.getElementById("targetCount").textContent = targets.length;
+
+      drawTarget(targets[0], "#42e8ff");
+      drawTarget(targets[1], "#ffcc4d");
+      drawTarget(targets[2], "#ff5f87");
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
