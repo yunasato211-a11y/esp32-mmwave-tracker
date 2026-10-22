@@ -36,7 +36,8 @@
 <body>
   <h1>ESP32 毫米波雷达目标追踪</h1>
   <div class="status">
-    当前模式：模拟数据｜目标数量：<span id="targetCount">3</span>
+    连接状态：<span id="connectionStatus">连接中...</span>
+    ｜目标数量：<span id="targetCount">0</span>
   </div>
 
   <canvas id="radar" width="900" height="600"></canvas>
@@ -48,6 +49,41 @@
     const originX = canvas.width / 2;
     const originY = canvas.height - 40;
     const scale = 80;
+    let targets = [];
+
+const targetColors = [
+  "#42e8ff",
+  "#ffcc4d",
+  "#ff5f87"
+];
+
+const connectionStatus =
+  document.getElementById("connectionStatus");
+
+const socket = new WebSocket("ws://localhost:8765");
+
+socket.addEventListener("open", () => {
+  connectionStatus.textContent = "已连接";
+  connectionStatus.style.color = "#5dff9a";
+});
+
+socket.addEventListener("message", (event) => {
+  const radarData = JSON.parse(event.data);
+  targets = radarData.targets;
+
+  document.getElementById("targetCount").textContent =
+    targets.length;
+});
+
+socket.addEventListener("close", () => {
+  connectionStatus.textContent = "已断开";
+  connectionStatus.style.color = "#ff5f87";
+});
+
+socket.addEventListener("error", () => {
+  connectionStatus.textContent = "连接失败";
+  connectionStatus.style.color = "#ff5f87";
+});
 
     function drawGrid() {
       ctx.strokeStyle = "#17445a";
@@ -104,41 +140,18 @@
       );
     }
 
-    function createTargets(time) {
-      return [
-        {
-          id: 1,
-          x_mm: 1200 * Math.sin(time),
-          y_mm: 2500 + 500 * Math.cos(time),
-          speed_cm_s: Math.round(120 * Math.cos(time))
-        },
-        {
-          id: 2,
-          x_mm: -1500 + (time * 300) % 3000,
-          y_mm: 3800,
-          speed_cm_s: 30
-        },
-        {
-          id: 3,
-          x_mm: 800 * Math.cos(time * 0.6),
-          y_mm: 1500 + 600 * Math.sin(time * 0.6),
-          speed_cm_s: Math.round(48 * Math.cos(time * 0.6))
-        }
-      ];
-    }
+    
 
     function animate() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawGrid();
 
-      const targets = createTargets(Date.now() / 1000);
-
-      document.getElementById("targetCount").textContent = targets.length;
-
-      drawTarget(targets[0], "#42e8ff");
-      drawTarget(targets[1], "#ffcc4d");
-      drawTarget(targets[2], "#ff5f87");
-
+      targets.forEach((target, index) => {
+  drawTarget(
+    target,
+    targetColors[index % targetColors.length]
+  );
+});
       requestAnimationFrame(animate);
     }
 
