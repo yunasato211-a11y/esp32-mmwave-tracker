@@ -62,56 +62,73 @@ const targetColors = [
 const connectionStatus =
   document.getElementById("connectionStatus");
 
-const socket = new WebSocket("ws://localhost:8765");
+  let socket;
+let reconnectTimer;
 
-socket.addEventListener("open", () => {
-  connectionStatus.textContent = "已连接";
-  connectionStatus.style.color = "#5dff9a";
-});
+function connectWebSocket() {
+  connectionStatus.textContent = "连接中...";
+  connectionStatus.style.color = "#73e2ff";
 
-socket.addEventListener("message", (event) => {
-  const radarData = JSON.parse(event.data);
-  targets = radarData.targets;
-  const activeTargetIds = new Set();
+  socket = new WebSocket("ws://localhost:8765");
 
-targets.forEach((target) => {
-  activeTargetIds.add(target.id);
+  socket.addEventListener("open", () => {
+    clearTimeout(reconnectTimer);
 
-  if (!targetHistory.has(target.id)) {
-    targetHistory.set(target.id, []);
-  }
-
-  const history = targetHistory.get(target.id);
-
-  history.push({
-    x_mm: target.x_mm,
-    y_mm: target.y_mm
+    connectionStatus.textContent = "已连接";
+    connectionStatus.style.color = "#5dff9a";
   });
 
-  if (history.length > maxTrailPoints) {
-    history.shift();
-  }
-});
+  socket.addEventListener("message", (event) => {
+    const radarData = JSON.parse(event.data);
+    targets = radarData.targets;
 
-for (const targetId of targetHistory.keys()) {
-  if (!activeTargetIds.has(targetId)) {
-    targetHistory.delete(targetId);
-  }
+    const activeTargetIds = new Set();
+
+    targets.forEach((target) => {
+      activeTargetIds.add(target.id);
+
+      if (!targetHistory.has(target.id)) {
+        targetHistory.set(target.id, []);
+      }
+
+      const history = targetHistory.get(target.id);
+
+      history.push({
+        x_mm: target.x_mm,
+        y_mm: target.y_mm
+      });
+
+      if (history.length > maxTrailPoints) {
+        history.shift();
+      }
+    });
+
+    for (const targetId of targetHistory.keys()) {
+      if (!activeTargetIds.has(targetId)) {
+        targetHistory.delete(targetId);
+      }
+    }
+
+    document.getElementById("targetCount").textContent =
+      targets.length;
+  });
+
+  socket.addEventListener("close", () => {
+    connectionStatus.textContent = "已断开，2 秒后重连";
+    connectionStatus.style.color = "#ffcc4d";
+
+    reconnectTimer = setTimeout(connectWebSocket, 2000);
+  });
+
+  socket.addEventListener("error", () => {
+    connectionStatus.textContent = "连接失败";
+    connectionStatus.style.color = "#ff5f87";
+
+    socket.close();
+  });
 }
 
-  document.getElementById("targetCount").textContent =
-    targets.length;
-});
-
-socket.addEventListener("close", () => {
-  connectionStatus.textContent = "已断开";
-  connectionStatus.style.color = "#ff5f87";
-});
-
-socket.addEventListener("error", () => {
-  connectionStatus.textContent = "连接失败";
-  connectionStatus.style.color = "#ff5f87";
-});
+connectWebSocket();
 
     function drawGrid() {
       ctx.strokeStyle = "#17445a";

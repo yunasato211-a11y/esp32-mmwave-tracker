@@ -3,6 +3,7 @@ import json
 import time
 
 from websockets.asyncio.server import serve
+from websockets.exceptions import ConnectionClosed
 
 from radar_simulator import create_targets
 
@@ -26,9 +27,10 @@ async def stream_radar_data(websocket):
             )
             await asyncio.sleep(0.1)
 
+    except ConnectionClosed:
+        pass
     finally:
         print("网页已断开。")
-
 
 async def main():
     server = await serve(
