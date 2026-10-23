@@ -50,6 +50,8 @@
     const originY = canvas.height - 40;
     const scale = 80;
     let targets = [];
+    const targetHistory = new Map();
+const maxTrailPoints = 40;
 
 const targetColors = [
   "#42e8ff",
@@ -70,6 +72,32 @@ socket.addEventListener("open", () => {
 socket.addEventListener("message", (event) => {
   const radarData = JSON.parse(event.data);
   targets = radarData.targets;
+  const activeTargetIds = new Set();
+
+targets.forEach((target) => {
+  activeTargetIds.add(target.id);
+
+  if (!targetHistory.has(target.id)) {
+    targetHistory.set(target.id, []);
+  }
+
+  const history = targetHistory.get(target.id);
+
+  history.push({
+    x_mm: target.x_mm,
+    y_mm: target.y_mm
+  });
+
+  if (history.length > maxTrailPoints) {
+    history.shift();
+  }
+});
+
+for (const targetId of targetHistory.keys()) {
+  if (!activeTargetIds.has(targetId)) {
+    targetHistory.delete(targetId);
+  }
+}
 
   document.getElementById("targetCount").textContent =
     targets.length;
@@ -123,6 +151,32 @@ socket.addEventListener("error", () => {
       ctx.fillText("雷达", originX + 12, originY - 8);
     }
 
+    function drawTrail(history, color) {
+  if (history.length < 2) {
+    return;
+  }
+
+  ctx.beginPath();
+
+  history.forEach((point, index) => {
+    const screenX = originX + point.x_mm / 1000 * scale;
+    const screenY = originY - point.y_mm / 1000 * scale;
+
+    if (index === 0) {
+      ctx.moveTo(screenX, screenY);
+    } else {
+      ctx.lineTo(screenX, screenY);
+    }
+  });
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+}
+
     function drawTarget(target, color) {
       const screenX = originX + target.x_mm / 1000 * scale;
       const screenY = originY - target.y_mm / 1000 * scale;
@@ -147,10 +201,11 @@ socket.addEventListener("error", () => {
       drawGrid();
 
       targets.forEach((target, index) => {
-  drawTarget(
-    target,
-    targetColors[index % targetColors.length]
-  );
+  const color = targetColors[index % targetColors.length];
+  const history = targetHistory.get(target.id) || [];
+
+  drawTrail(history, color);
+  drawTarget(target, color);
 });
       requestAnimationFrame(animate);
     }
